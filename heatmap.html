@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+  .axis path,
+  .axis line {
+    fill: none;
+    stroke: black;
+    shape-rendering: crispEdges;
+  }
+
+  .axis text {
+      font-family: sans-serif;
+      font-size: 11px;
+  }
+  
+  .nyoom{
+	font-family: sans-serif;
+	font-weight: bold;
+	font-size: 23px;
+	
+	}
+	.nyum{
+	font-family: sans-serif;
+	
+  }
+  
+</style>
+
+
+<div class="nyoom">
+ Behavioral Appropriatness <p></p></div>
+ 
+ <div class="nyum">
+Extremely Appropriate (0) to Extremely Innapropriate (9) <p></p>
+<button type="button" id="Tight" onclick="d3.selectAll('.heatmap svg').remove();d3.selectAll('.legend svg').remove();drawGraph(3)">Tight Relation (3 Colour)</button>
+<button type="button" id="Median" onclick="d3.selectAll('.heatmap svg').remove();d3.selectAll('.legend svg').remove();drawGraph(5)">Median Relation (5 Colour)</button>
+<button type="button" id="Loose" onclick="d3.selectAll('.heatmap svg').remove();d3.selectAll('.legend svg').remove();drawGraph(7)">Loose Relation (7 Colour)</button><br>
+
+</div>
+<div class="heatmap"></div>
+<div class="legend"></div>
+
+<script src="http://d3js.org/d3.v3.js"></script>
+<script>
+
+function drawGraph(colours)
+{
+  var pairsize = 30,  //size of each behavior-situation pair graphically
+      cellSize = pairsize - 1, //size of each cell on the heatmap
+      margin = {top: 120, right: 20, bottom: 20, left: 110};
+      
+  var width = 750 - margin.right - margin.left, 
+      height = 500;
+
+/// TOOLTIP
+
+
+	
+/// DATA 
+	  //create a x,y,value pair for each behavior,situation and value from the input file
+  d3.csv('behaviortranspose.csv', function ( response ) {
+    var data = response.map(function( pair ) {
+        var newPair = {};
+        newPair.behavior = pair.x;
+        newPair.situation = pair.y;
+        newPair.value = pair.value;
+		
+        return newPair;
+    })
+
+	//set the data elements for the visualization as the situations and behaviors from the previously generated pairs
+    var x_elements = d3.set(data.map(function( pair ) { return pair.situation; } )).values(),
+        y_elements = d3.set(data.map(function( pair ) { return pair.behavior; } )).values();
+
+	//define how x is scaled and create the x axis
+    var xScale = d3.scale.ordinal()
+        .domain(x_elements)
+        .rangeBands([0, x_elements.length * pairsize]);
+
+    var xAxis = d3.svg.axis()
+        .scale(xScale)
+        .tickFormat(function (d) {
+            return d;
+        })
+        .orient("top");
+
+		//define how y is scaled and define the y axis
+    var yScale = d3.scale.ordinal()
+        .domain(y_elements)
+        .rangeBands([0, y_elements.length * pairsize]);
+
+    var yAxis = d3.svg.axis()
+        .scale(yScale)
+        .tickFormat(function (d) {
+            return d;
+        })
+        .orient("left");
+
+		//define a range of colours to describe behavior
+		//the darkest ton is the most innapropriate and the lightest tone is the most appropriate
+		var red = 0xff;
+		var green = 0xff;
+		var blue = 0xff;
+		var step = Math.floor(0xff / colours.toString(16));
+		var redStep = Math.floor(step / 5);
+		var colors = ["#" + red.toString(16) + green.toString(16) + blue.toString(16)];
+		
+		//build and array of red colours of size colours for our visual to choose from starting from darkest red all the way down to white
+		//colours was the value we pass in when we call the function. If it's three we want an array of three colours.
+		for(var i = 0; i < colours - 1; i++)
+		{
+			red = red - redStep;
+			if(red < 0x00)
+				red = 0x00;
+			var colour = "#" + red.toString(16);
+			
+			green -= step;
+			if(green < 0x00)
+				green = 0x00;
+			if(green < 0x10)
+				colour += "0";
+			colour += green.toString(16);
+
+			blue -= step;
+			if(blue < 0x00)
+				blue = 0x00;
+			if(blue < 0x10)
+				colour += "0";
+			colour += blue.toString(16);
+			
+		    colors.push(colour);
+		}
+		//Reverse the colour ordering so it matches our data (first colour is white)
+		colors.reverse();
+		
+		//define colour range for the visual by scaling the domain from 0 to 9 
+		var colorRange = d3.scale.quantile().domain([0, 9]).range(colors);
+		step = 9 / colours;
+		var range = 0;
+		for(i = 0; i < colours; i++)
+		{
+		    range += step;
+			colorRange(range);
+		}
+
+
+	
+/// CREATE A HEATMAP
+		//create a heatmap svg
+    var svg = d3.select('.heatmap')
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+		
+		//create cells on the heatmap 
+    var cells = svg.selectAll('rect')
+        .data(data)
+        .enter().append('g').append('rect')
+        .attr('class', 'cell')
+        .attr('width', cellSize)
+        .attr('height', cellSize)
+        .attr('y', function(d) { return yScale(d.behavior); })
+        .attr('x', function(d) { return xScale(d.situation); })
+        .attr('fill', function(d) { return colorRange(d.value); });
+	
+		//add a yAxis to the heatmap
+    svg.append("g")
+        .attr("class", "y axis")
+        .call(yAxis)
+        .selectAll('text')
+        .attr('font-weight', 'normal');
+		//add an xAxis to the heatmap
+    svg.append("g")
+        .attr("class", "x axis")
+        .call(xAxis)
+        .selectAll('text')
+        .attr('font-weight', 'normal')
+        .style("text-anchor", "start")
+        .attr("dx", ".8em")
+        .attr("dy", ".5em")
+        .attr("transform", function (d) {
+            return "rotate(-65)";
+        });
+		
+/// CREATE A LEGEND 
+
+
+		//Make an SVG Container
+		var svgContainer = d3.select(".legend").append("svg")
+		.attr("width", width + margin.left + margin.right)
+        .attr("height", margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+	
+		//Append a defs (for definition) element to your SVG
+		var defs = svgContainer.append("defs");
+
+		//Append a linearGradient element to the defs and give it a unique id
+		var linearGradient = defs.append("linearGradient")
+			.attr("id", "linear-gradient");
+			
+		//Horizontal gradient
+		linearGradient
+			.attr("x1", "0%")
+			.attr("y1", "0%")
+			.attr("x2", "100%")
+			.attr("y2", "0%");
+
+			//Set the color for the start (0%)
+		linearGradient.append("stop") 
+			.attr("offset", "0%")   
+			.attr("stop-color", colors[0]); 
+
+		//Set the color for the end (100%)
+		linearGradient.append("stop") 
+			.attr("offset", "100%")   
+			.attr("stop-color", colors[colors.length - 1]); 
+			
+		//Draw the rectangle and fill with gradient
+		svgContainer.append("rect")
+			.attr("width", 300)
+			.attr("height", 20)
+			.style("fill", "url(#linear-gradient)");
+		
+		//define the elements for the x axis
+		var x_elements2 = [9,8,7,6,5,4,3,2,1,0];
+		
+		//define how x is scaled and create the x axis
+    var xScale2 = d3.scale.ordinal()
+		.domain(x_elements2)
+        .rangeBands([0, 320]);
+
+    var xAxis2 = d3.svg.axis()
+        .scale(xScale2)
+        .tickFormat(function (d) {
+            return d;
+        })
+        .orient("top");
+		
+		
+			//add an xAxis to the legend
+    svgContainer.append("g")
+        .attr("class", "x axis")
+        .call(xAxis2)
+        .selectAll('text')
+        .attr('font-weight', 'normal')
+        .style("text-anchor", "start")
+        .attr("dx", ".8em")
+        .attr("dy", ".5em")
+        .attr("transform", function (d) {
+            return "rotate(-65)";
+        });
+  });
+}
+drawGraph(3);
+
+</script>
